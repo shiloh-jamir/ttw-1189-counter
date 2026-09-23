@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Through the Word 1189 Counter</title>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.0/dist/confetti.browser.min.js"></script>
+<style>
+  :root {
+    --bg: #fbf7f2;
+    --card: #ffffff;
+    --ink: #2b2118;
+    --muted: #7a6a5c;
+    --track: #efe4d8;
+    --accent: #d9731a;
+    --border: #eadfd3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1916;
+      --card: #25211d;
+      --ink: #f4ede6;
+      --muted: #b3a597;
+      --track: #3a332c;
+      --accent: #f08a2e;
+      --border: #3a332c;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 24px 22px;
+    text-align: center;
+  }
+  .eyebrow {
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  .count {
+    font-size: clamp(64px, 18vw, 112px);
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    margin: 0;
+    color: var(--accent);
+  }
+  .label {
+    font-size: clamp(18px, 4.5vw, 24px);
+    font-weight: 600;
+    margin: 8px 0 20px;
+  }
+  .bar {
+    height: 10px;
+    background: var(--track);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    border-radius: 999px;
+    transition: width 1.2s ease;
+  }
+  .sub {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 10px 0 0;
+  }
+  .updated {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 14px 0 0;
+    opacity: 0.8;
+  }
+</style>
+</head>
+<body>
+  <main class="card" aria-live="polite">
+    <p class="eyebrow">Through the Word audio guides</p>
+    <p class="count" id="count">...</p>
+    <p class="label" id="label">chapters remaining</p>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="1189" id="bar"><div class="fill" id="fill"></div></div>
+    <p class="sub" id="sub">Loading progress toward all 1,189 chapters</p>
+    <p class="updated" id="updated"></p>
+  </main>
+
+<script>
+(function () {
+  var TOTAL = 1189;
+  var FEED_ID = "1QLYdVyWxtUYvEQxMHUqmmlkmi6OlbKlpV8jpqidFy3E";
+  var POLL_MS = 60000;
+  var params = new URLSearchParams(location.search);
+  var TEST = params.get("test") === "1";
+
+  var countEl = document.getElementById("count");
+  var labelEl = document.getElementById("label");
+  var fillEl = document.getElementById("fill");
+  var barEl = document.getElementById("bar");
+  var subEl = document.getElementById("sub");
+  var updatedEl = document.getElementById("updated");
+
+  var previous = null;   // last value shown, kept in memory only
+  var shown = null;      // number currently on screen
+  var reqId = 0;
+
+  function fmt(n) { return Number(n).toLocaleString("en-US"); }
+
+  function paint(n) {
+    shown = n;
+    countEl.textContent = fmt(n);
+    labelEl.textContent = n === 1 ? "chapter remaining" : "chapters remaining";
+    var done = TOTAL - n;
+    fillEl.style.width = Math.max(0, Math.min(100, (done / TOTAL) * 100)).toFixed(1) + "%";
+    barEl.setAttribute("aria-valuenow", String(done));
+    subEl.textContent = fmt(done) + " of " + fmt(TOTAL) + " chapters complete";
+  }
+
+  function animate(from, to) {
+    var start = null;
+    var dur = 1600;
+    function step(ts) {
+      if (start === null) start = ts;
+      var t = Math.min(1, (ts - start) / dur);
+      var eased = 1 - Math.pow(1 - t, 3);
+      paint(Math.round(from + (to - from) * eased));
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function celebrate() {
+    if (typeof confetti !== "function") return;
+    var colors = ["#d9731a", "#f2b46b", "#ffffff", "#8a5a2b"];
+    confetti({ particleCount: 140, spread: 80, origin: { y: 0.6 }, colors: colors });
+    setTimeout(function () {
+      confetti({ particleCount: 80, angle: 60, spread: 60, origin: { x: 0, y: 0.7 }, colors: colors });
+      confetti({ particleCount: 80, angle: 120, spread: 60, origin: { x: 1, y: 0.7 }, colors: colors });
+    }, 250);
+  }
+
+  function handle(value) {
+    if (typeof value !== "number" || !isFinite(value)) return;
+    value = Math.round(value);
+    if (previous === null) {
+      paint(value);
+    } else if (value < previous) {
+      animate(shown === null ? previous : shown, value);
+      celebrate();
+    } else if (value !== previous) {
+      paint(value);
+    }
+    previous = value;
+    updatedEl.textContent = "Checked " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function parseResponse(resp) {
+    try {
+      if (!resp || resp.status !== "ok") return null;
+      var row = resp.table && resp.table.rows && resp.table.rows[0];
+      var cell = row && row.c && row.c[0];
+      if (!cell) return null;
+      var v = typeof cell.v === "number" ? cell.v : parseFloat(String(cell.v).replace(/,/g, ""));
+      return isFinite(v) ? v : null;
+    } catch (e) { return null; }
+  }
+
+  // JSONP via the Google Visualization endpoint (script tag, so no CORS needed).
+  window.__ttw1189 = function (resp) { handle(parseResponse(resp)); };
+  window.google = window.google || {};
+  window.google.visualization = window.google.visualization || {};
+  window.google.visualization.Query = window.google.visualization.Query || {};
+  window.google.visualization.Query.setResponse = window.__ttw1189;
+
+  function poll() {
+    reqId += 1;
+    var s = document.createElement("script");
+    s.src = "https://docs.google.com/spreadsheets/d/" + FEED_ID +
+      "/gviz/tq?tqx=responseHandler:__ttw1189;reqId:" + reqId +
+      "&range=A2&headers=0&_=" + Date.now();
+    s.async = true;
+    s.onload = s.onerror = function () { s.remove(); };
+    document.head.appendChild(s);
+  }
+
+  poll();
+  setInterval(poll, POLL_MS);
+
+  // Preview only: ?test=1 shows the celebration once by pretending one chapter was finished.
+  if (TEST) {
+    setTimeout(function () { if (previous !== null) handle(previous - 1); }, 4000);
+  }
+})();
+</script>
+</body>
+</html>
